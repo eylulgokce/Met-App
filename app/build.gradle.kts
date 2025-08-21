@@ -40,7 +40,7 @@ android {
 }
 
 dependencies {
-
+    implementation("androidx.compose.material:material-icons-extended:<version>")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation(libs.androidx.core.ktx)
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.18.0")

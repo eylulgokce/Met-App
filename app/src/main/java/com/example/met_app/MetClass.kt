@@ -7,7 +7,6 @@ enum class MetClass(val label: String) {
     VIGOROUS("Vigorous");
 
 
-    fun toIndex(): Int = ordinal
 
     companion object {
         @JvmStatic

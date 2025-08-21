@@ -4,12 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 
 class MainViewModelFactory(
-    private val predictor: MLPredictor
+    private val predictor: MLPredictor,
+    private val accelerometerManager: AccelerometerManager
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
-            return MainViewModel(predictor) as T
+            return MainViewModel(predictor, accelerometerManager) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
