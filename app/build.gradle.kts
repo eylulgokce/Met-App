@@ -43,6 +43,7 @@ dependencies {
 
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation(libs.androidx.core.ktx)
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.18.0")
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))

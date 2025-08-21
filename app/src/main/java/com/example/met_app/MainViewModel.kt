@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class MainViewModel : ViewModel() {
+class MainViewModel(private val predictor: MLPredictor) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -20,8 +20,27 @@ class MainViewModel : ViewModel() {
     private var simulateJob: Job? = null
 
     init {
-        startTicking()
-        startSimulatingClassChanges()
+        startDemoPredicting()
+    }
+
+    private fun startDemoPredicting() = viewModelScope.launch {
+        while (isActive) {
+            delay(1_000)
+            val dummyFeatures = FloatArray(9) { (0..100).random() / 50f }
+            val prediction = predictor.predict(dummyFeatures)
+            updateState(prediction)
+        }
+    }
+
+    fun onNewPrediction(met: MetClass) {
+        updateState(met)
+    }
+    private fun updateState(predicted: MetClass) {
+        _uiState.update { state ->
+            val updatedDurations = state.durationsSec.toMutableMap()
+            updatedDurations[predicted] = (updatedDurations[predicted] ?: 0) + 1
+            state.copy(currentClass = predicted, durationsSec = updatedDurations)
+        }
     }
 
     private fun startTicking() {

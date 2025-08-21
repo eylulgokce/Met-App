@@ -31,21 +31,28 @@ import androidx.compose.foundation.layout.Spacer
 
 
 class MainActivity : ComponentActivity() {
+    private val predictor = MLPredictor()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        predictor.init(this) // load model once
+
         setContent {
-            MaterialTheme(colorScheme = lightColorScheme()) {
+            val vm: MainViewModel =
+                viewModel(factory = MainViewModelFactory(predictor))
+
+            MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    DashboardScreen()
+                    DashboardScreen(vm = vm)
                 }
             }
+
         }
     }
 }
 
 
 @Composable
-fun DashboardScreen(vm: MainViewModel = viewModel()) {
+fun DashboardScreen(vm: MainViewModel) {
     val state by vm.uiState.collectAsState()
 
     val colors = remember {
