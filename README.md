@@ -5,6 +5,9 @@
 All the data preprocessing, ML models training, and the recording of the app can be found on the main branch. This README corresponds to the project report. For the purpose of recoring of the app, we use mocked accelerator data and mocked daily/weekly summaries. 
 
 The repository of the android app can be found on android branch. 
+The repository of the android app with the faked data can be found in android_fake_data branch. 
+
+The upload speed is too low to upload the apk. That is why, it is missing in the current repository. 
 
 ## ML Models
 
