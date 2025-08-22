@@ -1,5 +1,9 @@
 # MET App
 
+## Repository Info
+
+All the data preprocessing, ML models training, and the recording of the app can be found on the main branch. This README corresponds to the project report.
+The repository of the android app can be found on android branch. 
 
 ## ML Models
 
