@@ -18,7 +18,7 @@ class AccelerometerManager(context: Context) : SensorEventListener {
     // Buffer to store accelerometer readings
     private val dataBuffer = mutableListOf<AccelData>()
     private val windowSizeMs = 5000L // 5 seconds
-    private val samplingRateUs = 20000 // 50Hz (1,000,000 / 50 = 20,000 microseconds)
+    private var samplingRateUs = 20000 // 50Hz (1,000,000 / 50 = 20,000 microseconds)
 
     private val _features = MutableStateFlow<FloatArray?>(null)
     val features: StateFlow<FloatArray?> = _features.asStateFlow()
@@ -32,8 +32,8 @@ class AccelerometerManager(context: Context) : SensorEventListener {
         val z: Float
     )
 
-    fun startRecording() {
 
+    fun startRecording() {
         if (!isRecording && accelerometer != null) {
             isRecording = true
             sensorManager.registerListener(this, accelerometer, samplingRateUs)
@@ -53,7 +53,6 @@ class AccelerometerManager(context: Context) : SensorEventListener {
             if (it.sensor.type == Sensor.TYPE_ACCELEROMETER) {
                 val currentTime = System.currentTimeMillis()
 
-                // Add new data point
                 dataBuffer.add(
                     AccelData(
                         timestamp = currentTime,
@@ -63,16 +62,24 @@ class AccelerometerManager(context: Context) : SensorEventListener {
                     )
                 )
 
-                // Remove old data points outside the window
                 val cutoffTime = currentTime - windowSizeMs
                 dataBuffer.removeAll { data -> data.timestamp < cutoffTime }
 
-                // Calculate features if we have enough data
-                if (dataBuffer.size >= 50) { // At least 1 second of data at 50Hz
+                // Validate sampling rate before calculating features
+                if (dataBuffer.size >= 30 && isValidSamplingRate()) {
                     calculateFeatures()
                 }
             }
         }
+    }
+
+    private fun isValidSamplingRate(): Boolean {
+        if (dataBuffer.size < 10) return false
+
+        val timeSpan = dataBuffer.last().timestamp - dataBuffer.first().timestamp
+        val actualSamplingRate = (dataBuffer.size - 1) * 1000.0 / timeSpan
+
+        return actualSamplingRate >= 20.0 // At least 20Hz
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
@@ -86,33 +93,51 @@ class AccelerometerManager(context: Context) : SensorEventListener {
         val yValues = dataBuffer.map { it.y }
         val zValues = dataBuffer.map { it.z }
 
-        // Calculate means
+        // Calculate magnitudes
+        val magnitudes = dataBuffer.map { sqrt(it.x*it.x + it.y*it.y + it.z*it.z) }
+
+        // statistical features
         val xMean = xValues.average().toFloat()
         val yMean = yValues.average().toFloat()
         val zMean = zValues.average().toFloat()
+        val magnitudeMean = magnitudes.average().toFloat()
 
-        // Calculate variances
         val xVar = xValues.map { (it - xMean) * (it - xMean) }.average().toFloat()
         val yVar = yValues.map { (it - yMean) * (it - yMean) }.average().toFloat()
         val zVar = zValues.map { (it - zMean) * (it - zMean) }.average().toFloat()
+        val magnitudeVar = magnitudes.map { (it - magnitudeMean) * (it - magnitudeMean) }.average().toFloat()
 
-        // Calculate standard deviations
-        val xStd = sqrt(xVar)
-        val yStd = sqrt(yVar)
-        val zStd = sqrt(zVar)
+        // movement intensity
+        val movementIntensity = calculateMovementIntensity(magnitudes)
 
-        // Create feature array matching your model's expected input
-        // ['x_mean', 'y_mean', 'z_mean', 'x_var', 'y_var', 'z_var', 'x_std', 'y_std', 'z_std']
         val featuresArray = floatArrayOf(
-            xMean, yMean, zMean,
-            xVar, yVar, zVar,
-            xStd, yStd, zStd
+            xMean, yMean, zMean, magnitudeMean,
+            xVar, yVar, zVar, magnitudeVar,
+            sqrt(xVar), sqrt(yVar), sqrt(zVar), sqrt(magnitudeVar),
+            movementIntensity
         )
 
         _features.value = featuresArray
     }
 
+    private fun calculateMovementIntensity(magnitudes: List<Float>): Float {
+        if (magnitudes.size < 2) return 0f
+
+        var totalChange = 0f
+        for (i in 1 until magnitudes.size) {
+            totalChange += kotlin.math.abs(magnitudes[i] - magnitudes[i-1])
+        }
+        return totalChange / (magnitudes.size - 1)
+    }
+
     fun isAccelerometerAvailable(): Boolean {
         return accelerometer != null
     }
+
+    fun getCurrentSamplingRate(): Int = samplingRateUs
+
+    fun setSamplingRate(newRate: Int) {
+        samplingRateUs = newRate
+    }
+
 }
