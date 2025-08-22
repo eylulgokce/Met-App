@@ -61,14 +61,16 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         predictor.init(this)
         accelerometerManager = AccelerometerManager(this)
+        accelerometerManager.enableDemoMode(true) // ← enable synthetic features
         database = AppDatabase.getDatabase(this)
 
         requestPermissions()
 
         setContent {
-            val vm: MainViewModel = viewModel(
-                factory = MainViewModelFactory(predictor, accelerometerManager, database)
-            )
+            val vm: MainViewModel = viewModel(factory = MainViewModelFactory(predictor, accelerometerManager, database))
+            LaunchedEffect(Unit) {
+                vm.populateDemoSummaries() // ← seed fake daily/weekly data once
+            }
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     DashboardScreen(vm = vm)

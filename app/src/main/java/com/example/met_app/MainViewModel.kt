@@ -150,4 +150,33 @@ class MainViewModel(
         super.onCleared()
         stopTracking()
     }
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun populateDemoSummaries() {
+        viewModelScope.launch {
+            val dao = database.activityDao()
+            val today = LocalDate.now()
+
+            // Helper to insert a whole day’s mix (minutes per class)
+            suspend fun insertDay(date: LocalDate, sed: Int, light: Int, mod: Int, vig: Int) {
+                if (sed > 0) dao.insertOrUpdateWithConfidence(ActivityRecord(date = date, metClass = MetClass.SEDENTARY, durationMinutes = sed, confidence = 0.9f))
+                if (light > 0) dao.insertOrUpdateWithConfidence(ActivityRecord(date = date, metClass = MetClass.LIGHT, durationMinutes = light, confidence = 0.9f))
+                if (mod > 0) dao.insertOrUpdateWithConfidence(ActivityRecord(date = date, metClass = MetClass.MODERATE, durationMinutes = mod, confidence = 0.9f))
+                if (vig > 0) dao.insertOrUpdateWithConfidence(ActivityRecord(date = date, metClass = MetClass.VIGOROUS, durationMinutes = vig, confidence = 0.9f))
+            }
+
+            // Seed last 7 days with varied mixes so the UI looks alive
+            insertDay(today.minusDays(6), sed = 180, light = 60,  mod = 30,  vig = 0)
+            insertDay(today.minusDays(5), sed = 120, light = 90,  mod = 45,  vig = 0)
+            insertDay(today.minusDays(4), sed = 200, light = 50,  mod = 20,  vig = 0)
+            insertDay(today.minusDays(3), sed = 150, light = 80,  mod = 30,  vig = 0)
+            insertDay(today.minusDays(2), sed = 100, light = 120, mod = 40,  vig = 0)
+            insertDay(today.minusDays(1), sed = 160, light = 70,  mod = 35,  vig = 0)
+            insertDay(today,            sed = 90,  light = 100, mod = 20,  vig = 0)
+
+            // Refresh what the UI observes
+            loadTodaysSummary()
+            loadWeeklySummary()
+        }
+    }
+
 }

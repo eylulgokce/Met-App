@@ -10,6 +10,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlin.math.sqrt
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+
 
 class AccelerometerManager(context: Context) : SensorEventListener {
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
@@ -32,8 +39,20 @@ class AccelerometerManager(context: Context) : SensorEventListener {
         val z: Float
     )
 
+    // --- Demo mode toggles & state ---
+    private var demoMode: Boolean = false
+    private var demoJob: kotlinx.coroutines.Job? = null
+
+    fun enableDemoMode(enable: Boolean) {
+        demoMode = enable
+    }
+
 
     fun startRecording() {
+        if (demoMode || !isAccelerometerAvailable()) {
+            startDemoEmission()
+            return
+        }
         if (!isRecording && accelerometer != null) {
             isRecording = true
             sensorManager.registerListener(this, accelerometer, samplingRateUs)
@@ -41,6 +60,12 @@ class AccelerometerManager(context: Context) : SensorEventListener {
     }
 
     fun stopRecording() {
+        if (demoMode) {
+            demoJob?.cancel()
+            demoJob = null
+            _features.value = null
+            return
+        }
         if (isRecording) {
             isRecording = false
             sensorManager.unregisterListener(this)
@@ -139,5 +164,68 @@ class AccelerometerManager(context: Context) : SensorEventListener {
     fun setSamplingRate(newRate: Int) {
         samplingRateUs = newRate
     }
+    private fun startDemoEmission() {
+        if (demoJob != null) return
+        demoJob = GlobalScope.launch(Dispatchers.Default) {
+            // Emit ~6–7 windows per second
+            val dtMs = 150L
+
+            // Each phase is tuned to push the model toward a target class
+            // Feature order: [x_mean, y_mean, z_mean, x_var, y_var, z_var, x_std, y_std, z_std]
+            data class Phase(val label: MetClass, val seconds: Int, val meanBias: Float, val varScale: Float, val noise: Float)
+
+            val phases = listOf(
+                // Very low variance/std, near-zero means -> Sedentary
+                Phase(MetClass.SEDENTARY, seconds = 12, meanBias = 0.00f, varScale = 0.002f, noise = 0.001f),
+
+                // Small rhythmic motion -> Light
+                Phase(MetClass.LIGHT,     seconds = 12, meanBias = 0.02f, varScale = 0.015f, noise = 0.006f),
+
+                // Medium rhythmic motion -> Moderate
+                Phase(MetClass.MODERATE,  seconds = 12, meanBias = 0.04f, varScale = 0.045f, noise = 0.015f),
+
+                // Highest amplitude + noise bursts -> Vigorous
+                Phase(MetClass.VIGOROUS,  seconds = 12, meanBias = 0.06f, varScale = 0.10f,  noise = 0.035f)
+            )
+
+            var phaseIdx = 0
+            var ticksInPhase = 0
+            var t = 0.0
+
+            fun nextFeatures(p: Phase, tt: Double): FloatArray {
+                // small sinusoid around meanBias; variance/std derived from varScale; add white noise
+                fun osc(freq: Double) = kotlin.math.sin(freq * tt).toFloat()
+                val xm = p.meanBias * osc(1.0) + (p.noise * (Math.random() - 0.5f)).toFloat()
+                val ym = p.meanBias * osc(0.8) + (p.noise * (Math.random() - 0.5f)).toFloat()
+                val zm = p.meanBias * osc(1.3) + (p.noise * (Math.random() - 0.5f)).toFloat()
+
+                val xv = p.varScale * 1.0f + p.noise * p.noise
+                val yv = p.varScale * 1.2f + p.noise * p.noise
+                val zv = p.varScale * 1.1f + p.noise * p.noise
+
+                val xs = kotlin.math.sqrt(xv)
+                val ys = kotlin.math.sqrt(yv)
+                val zs = kotlin.math.sqrt(zv)
+
+                return floatArrayOf(xm, ym, zm, xv, yv, zv, xs, ys, zs)
+            }
+
+            while (isActive) {
+                val p = phases[phaseIdx]
+                _features.value = nextFeatures(p, t)
+
+                // advance time & phase
+                t += 0.18
+                ticksInPhase += 1
+                val ticksPerPhase = (p.seconds * 1000) / dtMs
+                if (ticksInPhase >= ticksPerPhase) {
+                    ticksInPhase = 0
+                    phaseIdx = (phaseIdx + 1) % phases.size
+                }
+                delay(dtMs)
+            }
+        }
+    }
+
 
 }
