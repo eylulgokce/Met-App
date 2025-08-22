@@ -145,7 +145,6 @@ The application follows MVVM principles, but extends them with a **background se
   - Keeps tracking active even when the UI is closed.  
 
 
-  ----
 
 ---
 
